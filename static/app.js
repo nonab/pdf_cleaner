@@ -338,9 +338,42 @@ function setupEditor(data) {
     pdfFilesize.textContent = formatBytes(appState.size);
     pdfTotalPages.textContent = `${appState.pages.length} ${getPagesLabel(appState.pages.length, currentLang)}`;
 
+    // Restore saved state from localStorage if it exists for this file
+    const savedStateStr = localStorage.getItem(`pdf_state_${appState.filename}`);
+    if (savedStateStr) {
+        try {
+            const savedState = JSON.parse(savedStateStr);
+            if (savedState.deletePages) {
+                savedState.deletePages.forEach(idx => appState.deletePages.add(idx));
+            }
+            if (savedState.clearImagePages) {
+                savedState.clearImagePages.forEach(idx => appState.clearImagePages.add(idx));
+            }
+            if (savedState.alignText !== undefined) {
+                document.getElementById('chk-align-text').checked = savedState.alignText;
+            }
+            if (savedState.compressImages !== undefined) {
+                document.getElementById('chk-compress-images').checked = savedState.compressImages;
+            }
+        } catch (e) {
+            console.error("Failed to restore editor state:", e);
+        }
+    }
+
     renderGrid();
     updateStats();
     showView(editorView);
+}
+
+function saveEditorState() {
+    if (!appState.filename) return;
+    const state = {
+        deletePages: Array.from(appState.deletePages),
+        clearImagePages: Array.from(appState.clearImagePages),
+        alignText: document.getElementById('chk-align-text').checked,
+        compressImages: document.getElementById('chk-compress-images').checked
+    };
+    localStorage.setItem(`pdf_state_${appState.filename}`, JSON.stringify(state));
 }
 
 // Simple label helper for singular/plural/Polish declensions
@@ -383,6 +416,12 @@ function renderGrid() {
 
         if (page.is_blank) {
             card.classList.add('is-blank-page');
+        }
+        if (appState.deletePages.has(page.index)) {
+            card.classList.add('to-delete');
+        }
+        if (appState.clearImagePages.has(page.index)) {
+            card.classList.add('to-clean');
         }
 
         const deleteTitle = i18n[currentLang].mark_for_deletion_title;
@@ -477,6 +516,7 @@ function toggleDelete(idx, card) {
         card.classList.remove('to-clean');
     }
     updateStats();
+    saveEditorState();
 }
 
 function toggleClean(idx, card) {
@@ -492,6 +532,7 @@ function toggleClean(idx, card) {
         card.classList.add('to-clean');
     }
     updateStats();
+    saveEditorState();
 }
 
 // Update stats count bar
@@ -522,6 +563,7 @@ btnAutoBlank.addEventListener('click', () => {
         }
     });
     updateStats();
+    saveEditorState();
 });
 
 btnClearAllImages.addEventListener('click', () => {
@@ -536,6 +578,7 @@ btnClearAllImages.addEventListener('click', () => {
         }
     });
     updateStats();
+    saveEditorState();
 });
 
 btnResetSelection.addEventListener('click', () => {
@@ -546,6 +589,7 @@ btnResetSelection.addEventListener('click', () => {
         card.classList.remove('to-clean');
     });
     updateStats();
+    saveEditorState();
 });
 
 btnBackUpload.addEventListener('click', () => {
@@ -805,3 +849,7 @@ previewModal.addEventListener('click', (e) => {
         previewModal.classList.remove('active');
     }
 });
+
+// Checkbox change persistence
+document.getElementById('chk-align-text').addEventListener('change', saveEditorState);
+document.getElementById('chk-compress-images').addEventListener('change', saveEditorState);
