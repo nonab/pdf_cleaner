@@ -545,6 +545,18 @@ def api_process():
         err_msg = TRANSLATIONS[lang]["proc_error"].format(error=str(e))
         return jsonify({"error": err_msg}), 500
 
+@app.route('/api/logs')
+def api_logs():
+    """Returns the latest lines from the app.log file."""
+    try:
+        if os.path.exists(LOG_FILE_PATH):
+            with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            return jsonify({"logs": [line.strip() for line in lines if line.strip()]})
+    except Exception:
+        pass
+    return jsonify({"logs": []})
+
 @app.route('/api/process-local', methods=['POST'])
 def api_process_local():
     """Processes PDF and saves it directly to a local target path (Native mode)."""

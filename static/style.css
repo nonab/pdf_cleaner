@@ -679,6 +679,47 @@ body {
     font-weight: 700;
     font-family: var(--font-display);
 }
+.log-console-container {
+    width: 100%;
+    margin-top: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.log-console {
+    width: 100%;
+    height: 140px;
+    overflow-y: auto;
+    padding: 0.75rem 1rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.8rem;
+    color: rgba(34, 197, 94, 0.85); /* Greenish console color */
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    box-sizing: border-box;
+}
+.log-console div {
+    border-left: 2px solid var(--primary);
+    padding-left: 0.5rem;
+}
+.log-console div.align-log {
+    border-left-color: #3b82f6;
+    color: rgba(96, 165, 250, 0.9);
+}
+.log-console div.compress-log {
+    border-left-color: #eab308;
+    color: rgba(253, 224, 71, 0.9);
+}
+.log-console div.save-log {
+    border-left-color: var(--success);
+    color: rgba(52, 211, 153, 0.9);
+}
 
 /* Success Card details */
 .success-icon-wrapper {

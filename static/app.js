@@ -560,22 +560,89 @@ btnBackUpload.addEventListener('click', () => {
 
 // Progress Bar Simulation
 let progressInterval;
+let logInterval;
+
+function startLogPolling() {
+    const logConsole = document.getElementById('log-console');
+    logConsole.innerHTML = '<div class="system-log">Initializing process...</div>';
+    
+    logInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/logs');
+            if (response.ok) {
+                const data = await response.json();
+                const logs = data.logs || [];
+                
+                logConsole.innerHTML = '';
+                let currentProgressPercent = 0;
+                
+                logs.forEach(line => {
+                    const div = document.createElement('div');
+                    div.textContent = line;
+                    
+                    if (line.includes('[ALIGN]')) {
+                        div.className = 'align-log';
+                    } else if (line.includes('[COMPRESS]')) {
+                        div.className = 'compress-log';
+                    } else if (line.includes('Saving optimized')) {
+                        div.className = 'save-log';
+                    } else {
+                        div.className = 'system-log';
+                    }
+                    logConsole.appendChild(div);
+                    
+                    const progressMatch = line.match(/processing page (\d+)\/(\d+)/);
+                    if (progressMatch) {
+                        const current = parseInt(progressMatch[1], 10);
+                        const total = parseInt(progressMatch[2], 10);
+                        if (total > 0) {
+                            currentProgressPercent = Math.round((current / total) * 90);
+                        }
+                    }
+                    
+                    if (line.includes('Saving optimized')) {
+                        currentProgressPercent = 95;
+                    }
+                });
+                
+                if (currentProgressPercent > 0) {
+                    progressBarFill.style.width = `${currentProgressPercent}%`;
+                    progressPercent.textContent = `${currentProgressPercent}%`;
+                }
+                
+                logConsole.scrollTop = logConsole.scrollHeight;
+            }
+        } catch (err) {
+            console.error("Failed to fetch logs:", err);
+        }
+    }, 350);
+}
+
+function stopLogPolling() {
+    clearInterval(logInterval);
+}
+
 function startProgressSimulation() {
     progressBarFill.style.width = '0%';
     progressPercent.textContent = '0%';
     let val = 0;
     progressInterval = setInterval(() => {
-        if (val < 90) {
-            val += Math.random() * 5 + 1;
+        const percentText = progressPercent.textContent;
+        const currentVal = parseInt(percentText, 10) || 0;
+        if (currentVal < 90) {
+            val = Math.max(val, currentVal);
+            val += Math.random() * 4 + 1;
             if (val > 90) val = 90;
             progressBarFill.style.width = `${Math.round(val)}%`;
             progressPercent.textContent = `${Math.round(val)}%`;
         }
-    }, 150);
+    }, 200);
+    startLogPolling();
 }
 
 function finishProgressSimulation() {
     clearInterval(progressInterval);
+    stopLogPolling();
     progressBarFill.style.width = '100%';
     progressPercent.textContent = '100%';
 }
@@ -601,6 +668,7 @@ btnProcessPdf.addEventListener('click', async () => {
                 // Cancelled
                 processingOverlay.classList.remove('active');
                 clearInterval(progressInterval);
+                stopLogPolling();
                 return;
             }
 
@@ -627,12 +695,14 @@ btnProcessPdf.addEventListener('click', async () => {
                 alert(result.error || i18n[currentLang].optimization_error);
                 processingOverlay.classList.remove('active');
                 clearInterval(progressInterval);
+                stopLogPolling();
             }
         } catch (err) {
             console.error(err);
             alert(i18n[currentLang].saving_error);
             processingOverlay.classList.remove('active');
             clearInterval(progressInterval);
+            stopLogPolling();
         }
     } else {
         // Standard Web Mode Flow
@@ -659,12 +729,14 @@ btnProcessPdf.addEventListener('click', async () => {
                 alert(result.error || i18n[currentLang].optimization_error);
                 processingOverlay.classList.remove('active');
                 clearInterval(progressInterval);
+                stopLogPolling();
             }
         } catch (err) {
             console.error(err);
             alert(i18n[currentLang].connection_error);
             processingOverlay.classList.remove('active');
             clearInterval(progressInterval);
+            stopLogPolling();
         }
     }
 });
