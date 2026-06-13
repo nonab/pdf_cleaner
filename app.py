@@ -175,15 +175,9 @@ def clean_page_images(doc, page_idx):
             doc.update_stream(cxref, new_stream)
 
 
-def align_page_text(doc, page_idx):
-    """Straightens and left-aligns text on a page.
-    
-    Extracts text spans, calculates the main left margin, aligns text lines
-    horizontally (removing rotation and wobbliness), and redraws them on a clean page.
-    """
-    page = doc[page_idx]
-    log_info(f"[ALIGN] Aligning text on page {page_idx + 1}...")
-    text_dict = page.get_text("dict")
+def align_page_text_to(src_page, dest_page):
+    """Straightens and left-aligns text from src_page, drawing it onto dest_page."""
+    text_dict = src_page.get_text("dict")
     blocks = text_dict.get("blocks", [])
     
     # Extract all text spans grouped by line
@@ -222,10 +216,6 @@ def align_page_text(doc, page_idx):
     left_coords.sort()
     main_margin = left_coords[int(len(left_coords) * 0.15)] if left_coords else 54.0
     
-    # Create new blank page to replace the wobbly one
-    rect = page.rect
-    new_page = doc.new_page(page_idx + 1, width=rect.width, height=rect.height)
-    
     # Draw aligned text
     for line in text_lines:
         orig_x = line["orig_x"]
@@ -239,7 +229,6 @@ def align_page_text(doc, page_idx):
         for span in line["spans"]:
             font = span["font"]
             size = span["size"]
-            color = span["color"]
             text = span["text"]
             
             # Map original font to a clean standard PDF font (Helvetica / Helvetica-Bold)
@@ -249,7 +238,7 @@ def align_page_text(doc, page_idx):
             elif "italic" in font.lower() or "oblique" in font.lower():
                 std_font = "hebi"
                 
-            new_page.insert_text(
+            dest_page.insert_text(
                 fitz.Point(current_x, orig_y),
                 text,
                 fontsize=size,
@@ -258,9 +247,6 @@ def align_page_text(doc, page_idx):
             )
             
             current_x += span["width"]
-            
-    # Delete the old crooked page; new page shifts into its index
-    doc.delete_page(page_idx)
 
 
 def compress_image_xref(doc, xref, quality=50):
@@ -506,21 +492,31 @@ def api_process():
                 doc.close()
                 return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
-            doc.select(keep_indices)
+            # Create clean output document
+            out_doc = fitz.open()
             
             # 3. Apply post-processing (alignment and compression) on kept pages
             log_info(f"[PROCESS] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
-            for i in range(len(keep_indices)):
+            for i, page_idx in enumerate(keep_indices):
                 if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
                     log_info(f"[PROCESS] Progress: processing page {i + 1}/{len(keep_indices)}...")
+                
+                src_page = doc[page_idx]
+                rect = src_page.rect
+                
                 if align_text:
-                    align_page_text(doc, i)
+                    new_page = out_doc.new_page(-1, width=rect.width, height=rect.height)
+                    align_page_text_to(src_page, new_page)
+                else:
+                    out_doc.insert_pdf(doc, from_page=page_idx, to_page=page_idx)
+                    
                 if compress_images:
-                    compress_page_images(doc, i)
+                    compress_page_images(out_doc, len(out_doc) - 1)
             
             # Save optimized version
             log_info(f"[PROCESS] Saving optimized PDF to {out_path}...")
-            doc.save(out_path, garbage=4, deflate=True)
+            out_doc.save(out_path, garbage=4, deflate=True)
+            out_doc.close()
             doc.close()
 
         orig_size = pdf_info["size"]
@@ -596,21 +592,31 @@ def api_process_local():
                 doc.close()
                 return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
-            doc.select(keep_indices)
+            # Create clean output document
+            out_doc = fitz.open()
             
             # Apply post-processing (alignment and compression) on kept pages
             log_info(f"[PROCESS-LOCAL] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
-            for i in range(len(keep_indices)):
+            for i, page_idx in enumerate(keep_indices):
                 if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
                     log_info(f"[PROCESS-LOCAL] Progress: processing page {i + 1}/{len(keep_indices)}...")
+                
+                src_page = doc[page_idx]
+                rect = src_page.rect
+                
                 if align_text:
-                    align_page_text(doc, i)
+                    new_page = out_doc.new_page(-1, width=rect.width, height=rect.height)
+                    align_page_text_to(src_page, new_page)
+                else:
+                    out_doc.insert_pdf(doc, from_page=page_idx, to_page=page_idx)
+                    
                 if compress_images:
-                    compress_page_images(doc, i)
+                    compress_page_images(out_doc, len(out_doc) - 1)
             
             # Save optimized directly to user's desired path
             log_info(f"[PROCESS-LOCAL] Saving optimized PDF directly to {save_path}...")
-            doc.save(save_path, garbage=4, deflate=True)
+            out_doc.save(save_path, garbage=4, deflate=True)
+            out_doc.close()
             doc.close()
 
         orig_size = pdf_info["size"]
