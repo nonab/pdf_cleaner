@@ -5,7 +5,7 @@ import socket
 import threading
 import webbrowser
 import locale
-from flask import Flask, render_code, render_template, request, jsonify, send_file, abort
+from flask import Flask, render_template, request, jsonify, send_file, abort
 
 # Initialize Flask app using sys._MEIPASS for PyInstaller assets if frozen
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -159,6 +159,135 @@ def clean_page_images(doc, page_idx):
             # If the PDF sets gray fill or color, we can force black/colored text by replacing color statements if needed,
             # but usually 0 Tr is enough to show the text.
             doc.update_stream(cxref, new_stream)
+
+
+def align_page_text(doc, page_idx):
+    """Straightens and left-aligns text on a page.
+    
+    Extracts text spans, calculates the main left margin, aligns text lines
+    horizontally (removing rotation and wobbliness), and redraws them on a clean page.
+    """
+    page = doc[page_idx]
+    text_dict = page.get_text("dict")
+    blocks = text_dict.get("blocks", [])
+    
+    # Extract all text spans grouped by line
+    text_lines = []
+    left_coords = []
+    
+    for b in blocks:
+        if b.get("type") == 0:  # Text block
+            for line in b.get("lines", []):
+                spans_data = []
+                line_bbox = line["bbox"]
+                orig_x = line_bbox[0]
+                orig_y = (line_bbox[1] + line_bbox[3]) / 2.0
+                
+                for span in line.get("spans", []):
+                    spans_data.append({
+                        "text": span["text"],
+                        "font": span["font"],
+                        "size": span["size"],
+                        "color": span["color"],
+                        "width": span["bbox"][2] - span["bbox"][0]
+                    })
+                
+                if spans_data:
+                    text_lines.append({
+                        "orig_x": orig_x,
+                        "orig_y": orig_y,
+                        "spans": spans_data
+                    })
+                    left_coords.append(orig_x)
+                    
+    if not text_lines:
+        return  # Nothing to align
+        
+    # Calculate main left margin (common left coordinate, e.g., 15th percentile)
+    left_coords.sort()
+    main_margin = left_coords[int(len(left_coords) * 0.15)] if left_coords else 54.0
+    
+    # Create new blank page to replace the wobbly one
+    rect = page.rect
+    new_page = doc.new_page(page_idx + 1, width=rect.width, height=rect.height)
+    
+    # Draw aligned text
+    for line in text_lines:
+        orig_x = line["orig_x"]
+        orig_y = line["orig_y"]
+        
+        # Check if line is indented (e.g. paragraph start)
+        is_indented = (orig_x - main_margin) > 15.0
+        target_x = main_margin + (orig_x - main_margin if is_indented else 0)
+        
+        current_x = target_x
+        for span in line["spans"]:
+            font = span["font"]
+            size = span["size"]
+            color = span["color"]
+            text = span["text"]
+            
+            # Map original font to a clean standard PDF font (Helvetica / Helvetica-Bold)
+            std_font = "helv"
+            if "bold" in font.lower():
+                std_font = "hebo"
+            elif "italic" in font.lower() or "oblique" in font.lower():
+                std_font = "hebi"
+                
+            new_page.insert_text(
+                fitz.Point(current_x, orig_y),
+                text,
+                fontsize=size,
+                fontname=std_font,
+                color=fitz.PDF_COLOR_BLACK  # Force clean black text on white bg
+            )
+            
+            current_x += span["width"]
+            
+    # Delete the old crooked page; new page shifts into its index
+    doc.delete_page(page_idx)
+
+
+def compress_image_xref(doc, xref, quality=50):
+    """Re-encodes the image at the given xref as a compressed JPEG if it saves space."""
+    try:
+        base_image = doc.extract_image(xref)
+        if not base_image:
+            return
+        orig_bytes = base_image["image"]
+        
+        # Load the image into a Pixmap
+        pix = fitz.Pixmap(doc, xref)
+        
+        # Determine target colorspace and re-encode
+        if not pix.colorspace or pix.colorspace.n > 3 or pix.alpha:
+            pix_rgb = fitz.Pixmap(fitz.csRGB, pix)
+            compressed_bytes = pix_rgb.tobytes("jpg", quality=quality)
+            colorspace_name = "/DeviceRGB"
+        else:
+            compressed_bytes = pix.tobytes("jpg", quality=quality)
+            if pix.colorspace.n == 1:
+                colorspace_name = "/DeviceGray"
+            else:
+                colorspace_name = "/DeviceRGB"
+                
+        # Only replace if the compressed version is smaller
+        if len(compressed_bytes) < len(orig_bytes):
+            doc.update_stream(xref, compressed_bytes)
+            doc.xref_set_key(xref, "Filter", "/DCTDecode")
+            doc.xref_set_key(xref, "ColorSpace", colorspace_name)
+    except Exception as e:
+        print(f"Failed to compress image at xref {xref}: {e}")
+
+
+def compress_page_images(doc, page_idx, quality=50):
+    """Compresses all raster images on a page to JPEG format with reduced quality."""
+    page = doc[page_idx]
+    image_list = page.get_images()
+    for img in image_list:
+        xref = img[0]
+        compress_image_xref(doc, xref, quality=quality)
+
 
 
 # --- Flask Web Server Routes ---
@@ -320,6 +449,8 @@ def api_process():
     pdf_id = data.get('pdf_id')
     delete_pages = data.get('delete_pages', [])  # list of indices
     clear_image_pages = data.get('clear_image_pages', [])  # list of indices
+    align_text = data.get('align_text', False)
+    compress_images = data.get('compress_images', False)
     
     # Cast to int to make sure
     delete_pages = [int(i) for i in delete_pages]
@@ -350,6 +481,13 @@ def api_process():
                 return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
             doc.select(keep_indices)
+            
+            # 3. Apply post-processing (alignment and compression) on kept pages
+            for i in range(len(keep_indices)):
+                if align_text:
+                    align_page_text(doc, i)
+                if compress_images:
+                    compress_page_images(doc, i)
             
             # Save optimized version
             doc.save(out_path, garbage=4, deflate=True)
@@ -390,6 +528,8 @@ def api_process_local():
     save_path = data.get('save_path')
     delete_pages = data.get('delete_pages', [])
     clear_image_pages = data.get('clear_image_pages', [])
+    align_text = data.get('align_text', False)
+    compress_images = data.get('compress_images', False)
 
     delete_pages = [int(i) for i in delete_pages]
     clear_image_pages = [int(i) for i in clear_image_pages]
@@ -418,6 +558,13 @@ def api_process_local():
                 return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
             doc.select(keep_indices)
+            
+            # Apply post-processing (alignment and compression) on kept pages
+            for i in range(len(keep_indices)):
+                if align_text:
+                    align_page_text(doc, i)
+                if compress_images:
+                    compress_page_images(doc, i)
             
             # Save optimized directly to user's desired path
             doc.save(save_path, garbage=4, deflate=True)

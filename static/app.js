@@ -28,6 +28,12 @@ const i18n = {
         download_pdf_btn: "Download PDF File",
         process_another_btn: "Process another file",
         
+        // Settings Checkboxes
+        align_text_title: "Straighten wobbly pages and align text lines",
+        align_text_label: "Align & straighten text",
+        compress_images_title: "Compress remaining background images to reduce file size",
+        compress_images_label: "Compress images",
+        
         // Alerts & Prompts
         only_pdf_allowed: "Only PDF files are allowed!",
         loading_analyzing: "Loading and analyzing PDF file...",
@@ -75,6 +81,12 @@ const i18n = {
         save_pdf_btn: "Zapisz plik PDF",
         download_pdf_btn: "Pobierz plik PDF",
         process_another_btn: "Przetwórz kolejny plik",
+        
+        // Settings Checkboxes
+        align_text_title: "Wyprostuj krzywe strony i wyrównaj linie tekstu",
+        align_text_label: "Wyrównaj i wyprostuj tekst",
+        compress_images_title: "Kompresuj pozostałe obrazy tła, aby zmniejszyć wagę pliku",
+        compress_images_label: "Kompresuj obrazy",
         
         // Alerts & Prompts
         only_pdf_allowed: "Dozwolone są tylko pliki PDF!",
@@ -572,6 +584,8 @@ function finishProgressSimulation() {
 btnProcessPdf.addEventListener('click', async () => {
     const deleteList = Array.from(appState.deletePages);
     const cleanList = Array.from(appState.clearImagePages);
+    const alignText = document.getElementById('chk-align-text').checked;
+    const compressImages = document.getElementById('chk-compress-images').checked;
 
     progressStatus.textContent = i18n[currentLang].optimizing_subtitle;
     startProgressSimulation();
@@ -597,7 +611,9 @@ btnProcessPdf.addEventListener('click', async () => {
                     pdf_id: appState.pdfId,
                     save_path: savePath,
                     delete_pages: deleteList,
-                    clear_image_pages: cleanList
+                    clear_image_pages: cleanList,
+                    align_text: alignText,
+                    compress_images: compressImages
                 })
             });
             const result = await response.json();
@@ -627,7 +643,9 @@ btnProcessPdf.addEventListener('click', async () => {
                 body: JSON.stringify({
                     pdf_id: appState.pdfId,
                     delete_pages: deleteList,
-                    clear_image_pages: cleanList
+                    clear_image_pages: cleanList,
+                    align_text: alignText,
+                    compress_images: compressImages
                 })
             });
             const result = await response.json();
