@@ -30,6 +30,17 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # Lock for thread-safe operations on PyMuPDF documents
 doc_lock = threading.Lock()
 
+# Log path and logging function
+LOG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.log")
+def log_info(message):
+    print(message)
+    sys.stdout.flush()
+    try:
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
+    except Exception:
+        pass
+
 # --- i18n Backend Translations ---
 # To add a new language, simply add its translations here (e.g. "de": { ... })
 TRANSLATIONS = {
@@ -171,7 +182,7 @@ def align_page_text(doc, page_idx):
     horizontally (removing rotation and wobbliness), and redraws them on a clean page.
     """
     page = doc[page_idx]
-    print(f"[ALIGN] Aligning text on page {page_idx + 1}...")
+    log_info(f"[ALIGN] Aligning text on page {page_idx + 1}...")
     text_dict = page.get_text("dict")
     blocks = text_dict.get("blocks", [])
     
@@ -281,7 +292,7 @@ def compress_image_xref(doc, xref, quality=50):
             doc.xref_set_key(xref, "Filter", "/DCTDecode")
             doc.xref_set_key(xref, "ColorSpace", colorspace_name)
     except Exception as e:
-        print(f"Failed to compress image at xref {xref}: {e}")
+        log_info(f"Failed to compress image at xref {xref}: {e}")
 
 
 def compress_page_images(doc, page_idx, quality=50):
@@ -289,7 +300,7 @@ def compress_page_images(doc, page_idx, quality=50):
     page = doc[page_idx]
     image_list = page.get_images(full=True)
     if image_list:
-        print(f"[COMPRESS] Compressing {len(image_list)} images on page {page_idx + 1}...")
+        log_info(f"[COMPRESS] Compressing {len(image_list)} images on page {page_idx + 1}...")
     for img in image_list:
         xref = img[0]
         compress_image_xref(doc, xref, quality=quality)
@@ -466,6 +477,13 @@ def api_process():
     if not pdf_info:
         return jsonify({"error": TRANSLATIONS[lang]["pdf_expired"]}), 404
 
+    # Clear log file for a new run
+    try:
+        with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+            f.write("=== PDF Processing Log ===\n")
+    except Exception:
+        pass
+
     try:
         out_id = str(uuid.uuid4())
         out_filename = f"cleaned_{pdf_info['filename']}"
@@ -476,7 +494,7 @@ def api_process():
             
             # 1. Clean images and restore text visibility
             if clear_image_pages:
-                print(f"[PROCESS] Clearing images from {len(clear_image_pages)} pages...")
+                log_info(f"[PROCESS] Clearing images from {len(clear_image_pages)} pages...")
             for idx in clear_image_pages:
                 clean_page_images(doc, idx)
 
@@ -491,17 +509,17 @@ def api_process():
             doc.select(keep_indices)
             
             # 3. Apply post-processing (alignment and compression) on kept pages
-            print(f"[PROCESS] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
+            log_info(f"[PROCESS] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
             for i in range(len(keep_indices)):
                 if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
-                    print(f"[PROCESS] Progress: processing page {i + 1}/{len(keep_indices)}...")
+                    log_info(f"[PROCESS] Progress: processing page {i + 1}/{len(keep_indices)}...")
                 if align_text:
                     align_page_text(doc, i)
                 if compress_images:
                     compress_page_images(doc, i)
             
             # Save optimized version
-            print(f"[PROCESS] Saving optimized PDF to {out_path}...")
+            log_info(f"[PROCESS] Saving optimized PDF to {out_path}...")
             doc.save(out_path, garbage=4, deflate=True)
             doc.close()
 
@@ -553,13 +571,20 @@ def api_process_local():
     if not save_path:
         return jsonify({"error": TRANSLATIONS[lang]["no_save_path"]}), 400
 
+    # Clear log file for a new run
+    try:
+        with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+            f.write("=== PDF Processing Log ===\n")
+    except Exception:
+        pass
+
     try:
         with doc_lock:
             doc = fitz.open(pdf_info["path"])
             
             # Clean images and restore text visibility
             if clear_image_pages:
-                print(f"[PROCESS-LOCAL] Clearing images from {len(clear_image_pages)} pages...")
+                log_info(f"[PROCESS-LOCAL] Clearing images from {len(clear_image_pages)} pages...")
             for idx in clear_image_pages:
                 clean_page_images(doc, idx)
 
@@ -574,17 +599,17 @@ def api_process_local():
             doc.select(keep_indices)
             
             # Apply post-processing (alignment and compression) on kept pages
-            print(f"[PROCESS-LOCAL] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
+            log_info(f"[PROCESS-LOCAL] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
             for i in range(len(keep_indices)):
                 if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
-                    print(f"[PROCESS-LOCAL] Progress: processing page {i + 1}/{len(keep_indices)}...")
+                    log_info(f"[PROCESS-LOCAL] Progress: processing page {i + 1}/{len(keep_indices)}...")
                 if align_text:
                     align_page_text(doc, i)
                 if compress_images:
                     compress_page_images(doc, i)
             
             # Save optimized directly to user's desired path
-            print(f"[PROCESS-LOCAL] Saving optimized PDF directly to {save_path}...")
+            log_info(f"[PROCESS-LOCAL] Saving optimized PDF directly to {save_path}...")
             doc.save(save_path, garbage=4, deflate=True)
             doc.close()
 
