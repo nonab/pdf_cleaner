@@ -67,62 +67,66 @@
             <section id="editor-view" class="inactive-view">
                 <!-- Editor Sidebar/Toolbar -->
                 <div class="editor-toolbar glass">
-                    <div class="file-meta">
-                        <button id="btn-back-upload" class="btn btn-secondary btn-icon-only" data-i18n-title="choose_another_title" title="Choose another file">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="19" y1="12" x2="5" y2="12" />
-                                <polyline points="12 19 5 12 12 5" />
-                            </svg>
-                        </button>
-                        <div class="file-details">
-                            <h3 id="pdf-filename">Filename.pdf</h3>
-                            <span id="pdf-filesize">0.0 MB</span>
-                            <span class="meta-divider">•</span>
-                            <span id="pdf-total-pages">0 pages</span>
+                    <div class="toolbar-top-row">
+                        <div class="file-meta">
+                            <button id="btn-back-upload" class="btn btn-secondary btn-icon-only" data-i18n-title="choose_another_title" title="Choose another file">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="19" y1="12" x2="5" y2="12" />
+                                    <polyline points="12 19 5 12 12 5" />
+                                </svg>
+                            </button>
+                            <div class="file-details">
+                                <h3 id="pdf-filename">Filename.pdf</h3>
+                                <span id="pdf-filesize">0.0 MB</span>
+                                <span class="meta-divider">•</span>
+                                <span id="pdf-total-pages">0 pages</span>
+                            </div>
+                        </div>
+
+                        <!-- Process action button -->
+                        <div class="action-wrapper">
+                            <button id="btn-process-pdf" class="btn btn-success btn-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                <span data-i18n="optimize_save_btn">Optimize & Save PDF</span>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Batch controls -->
-                    <div class="batch-controls">
-                        <button id="btn-auto-blank" class="btn btn-outline" data-i18n-title="mark_blank_title" title="Automatically mark blank pages for deletion">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                            </svg>
-                            <span data-i18n="mark_blank_btn">Mark blank pages</span>
-                        </button>
-                        <button id="btn-clear-all-images" class="btn btn-outline-warning" data-i18n-title="clear_images_all_title" title="Clear images from all pages">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-                                <path d="m9 12 2 2 4-4" />
-                            </svg>
-                            <span data-i18n="clear_images_all_btn">Clear images (all)</span>
-                        </button>
-                        <button id="btn-reset-selection" class="btn btn-text">
-                            <span data-i18n="reset_changes_btn">Reset changes</span>
-                        </button>
-                    </div>
+                    <div class="toolbar-bottom-row">
+                        <!-- Batch controls -->
+                        <div class="batch-controls">
+                            <button id="btn-auto-blank" class="btn btn-outline" data-i18n-title="mark_blank_title" title="Automatically mark blank pages for deletion">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                </svg>
+                                <span data-i18n="mark_blank_btn">Mark blank pages</span>
+                            </button>
+                            <button id="btn-clear-all-images" class="btn btn-outline-warning" data-i18n-title="clear_images_all_title" title="Clear images from all pages">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                                    <path d="m9 12 2 2 4-4" />
+                                </svg>
+                                <span data-i18n="clear_images_all_btn">Clear images (all)</span>
+                            </button>
+                            <button id="btn-reset-selection" class="btn btn-text">
+                                <span data-i18n="reset_changes_btn">Reset changes</span>
+                            </button>
+                        </div>
 
-                    <!-- Optimization Settings -->
-                    <div class="optimization-settings">
-                        <label class="setting-checkbox" data-i18n-title="align_text_title" title="Straighten wobbly pages and align text lines">
-                            <input type="checkbox" id="chk-align-text">
-                            <span data-i18n="align_text_label">Align & straighten text</span>
-                        </label>
-                        <label class="setting-checkbox" data-i18n-title="compress_images_title" title="Compress remaining background images to reduce file size">
-                            <input type="checkbox" id="chk-compress-images">
-                            <span data-i18n="compress_images_label">Compress images</span>
-                        </label>
-                    </div>
-
-                    <!-- Process action button -->
-                    <div class="action-wrapper">
-                        <button id="btn-process-pdf" class="btn btn-success btn-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            <span data-i18n="optimize_save_btn">Optimize & Save PDF</span>
-                        </button>
+                        <!-- Optimization Settings -->
+                        <div class="optimization-settings">
+                            <label class="setting-checkbox" data-i18n-title="align_text_title" title="Straighten wobbly pages and align text lines">
+                                <input type="checkbox" id="chk-align-text">
+                                <span data-i18n="align_text_label">Align & straighten text</span>
+                            </label>
+                            <label class="setting-checkbox" data-i18n-title="compress_images_title" title="Compress remaining background images to reduce file size">
+                                <input type="checkbox" id="chk-compress-images">
+                                <span data-i18n="compress_images_label">Compress images</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 

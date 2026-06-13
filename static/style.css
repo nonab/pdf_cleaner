@@ -311,12 +311,37 @@ body {
 /* Editor View CSS */
 .editor-toolbar {
     display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem 2rem;
+    margin-bottom: 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-radius: 0 0 16px 16px;
+}
+.toolbar-top-row {
+    display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.25rem 2rem;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
+    width: 100%;
     gap: 1.5rem;
+    flex-wrap: wrap;
+}
+.toolbar-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.75rem;
 }
 .file-meta {
     display: flex;
@@ -787,9 +812,14 @@ body {
 
 /* Responsive adjust */
 @media(max-width: 768px) {
-    .editor-toolbar {
+    .toolbar-top-row, .toolbar-bottom-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 1rem;
+    }
+    .toolbar-bottom-row {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 1rem;
     }
     .batch-controls {
         flex-wrap: wrap;

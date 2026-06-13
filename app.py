@@ -140,13 +140,16 @@ def clean_page_images(doc, page_idx):
     page = doc[page_idx]
     
     # 1. Remove all raster images
-    img_list = page.get_images()
+    img_list = page.get_images(full=True)
     for img in img_list:
         xref = img[0]
-        # Replace image with a tiny transparent pixel to avoid structure breakage
-        rect = page.get_image_bbox(img)
+        try:
+            # Replace image with a tiny transparent pixel to avoid structure breakage
+            rect = page.get_image_bbox(img)
+        except Exception:
+            pass
         page.clean_contents()
-        doc.delete_image(xref)
+        page.delete_image(xref)
         
     # 2. Fix text rendering mode from 3 Tr (hidden) to 0 Tr (visible)
     # Get the raw contents stream
@@ -168,6 +171,7 @@ def align_page_text(doc, page_idx):
     horizontally (removing rotation and wobbliness), and redraws them on a clean page.
     """
     page = doc[page_idx]
+    print(f"[ALIGN] Aligning text on page {page_idx + 1}...")
     text_dict = page.get_text("dict")
     blocks = text_dict.get("blocks", [])
     
@@ -239,7 +243,7 @@ def align_page_text(doc, page_idx):
                 text,
                 fontsize=size,
                 fontname=std_font,
-                color=fitz.PDF_COLOR_BLACK  # Force clean black text on white bg
+                color=(0, 0, 0)  # Force clean black text on white bg
             )
             
             current_x += span["width"]
@@ -283,7 +287,9 @@ def compress_image_xref(doc, xref, quality=50):
 def compress_page_images(doc, page_idx, quality=50):
     """Compresses all raster images on a page to JPEG format with reduced quality."""
     page = doc[page_idx]
-    image_list = page.get_images()
+    image_list = page.get_images(full=True)
+    if image_list:
+        print(f"[COMPRESS] Compressing {len(image_list)} images on page {page_idx + 1}...")
     for img in image_list:
         xref = img[0]
         compress_image_xref(doc, xref, quality=quality)
@@ -469,6 +475,8 @@ def api_process():
             doc = fitz.open(pdf_info["path"])
             
             # 1. Clean images and restore text visibility
+            if clear_image_pages:
+                print(f"[PROCESS] Clearing images from {len(clear_image_pages)} pages...")
             for idx in clear_image_pages:
                 clean_page_images(doc, idx)
 
@@ -483,13 +491,17 @@ def api_process():
             doc.select(keep_indices)
             
             # 3. Apply post-processing (alignment and compression) on kept pages
+            print(f"[PROCESS] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
             for i in range(len(keep_indices)):
+                if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
+                    print(f"[PROCESS] Progress: processing page {i + 1}/{len(keep_indices)}...")
                 if align_text:
                     align_page_text(doc, i)
                 if compress_images:
                     compress_page_images(doc, i)
             
             # Save optimized version
+            print(f"[PROCESS] Saving optimized PDF to {out_path}...")
             doc.save(out_path, garbage=4, deflate=True)
             doc.close()
 
@@ -546,6 +558,8 @@ def api_process_local():
             doc = fitz.open(pdf_info["path"])
             
             # Clean images and restore text visibility
+            if clear_image_pages:
+                print(f"[PROCESS-LOCAL] Clearing images from {len(clear_image_pages)} pages...")
             for idx in clear_image_pages:
                 clean_page_images(doc, idx)
 
@@ -560,13 +574,17 @@ def api_process_local():
             doc.select(keep_indices)
             
             # Apply post-processing (alignment and compression) on kept pages
+            print(f"[PROCESS-LOCAL] Running post-processing (align={align_text}, compress={compress_images}) on {len(keep_indices)} pages...")
             for i in range(len(keep_indices)):
+                if (i + 1) % 10 == 0 or i == 0 or i == len(keep_indices) - 1:
+                    print(f"[PROCESS-LOCAL] Progress: processing page {i + 1}/{len(keep_indices)}...")
                 if align_text:
                     align_page_text(doc, i)
                 if compress_images:
                     compress_page_images(doc, i)
             
             # Save optimized directly to user's desired path
+            print(f"[PROCESS-LOCAL] Saving optimized PDF directly to {save_path}...")
             doc.save(save_path, garbage=4, deflate=True)
             doc.close()
 
