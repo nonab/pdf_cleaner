@@ -27,7 +27,7 @@
                 <h1>PDF <span>Cleaner</span></h1>
             </div>
             <div id="connection-status" class="status-badge native-badge" style="display: none;">
-                <span class="dot"></span> Desktop Mode (Fast)
+                <span class="dot"></span> <span data-i18n="desktop_mode">Desktop Mode (Fast)</span>
             </div>
         </header>
 
@@ -43,8 +43,8 @@
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
                                 </svg>
                             </div>
-                            <h2>Drag & drop PDF file here</h2>
-                            <p class="upload-subtitle">or browse files on your computer</p>
+                            <h2 data-i18n="drag_drop_title">Drag & drop PDF file here</h2>
+                            <p class="upload-subtitle" data-i18n="drag_drop_subtitle">or browse files on your computer</p>
                             
                             <div class="upload-actions">
                                 <button id="btn-select-file" class="btn btn-primary btn-lg">
@@ -53,11 +53,11 @@
                                         <line x1="12" y1="8" x2="12" y2="16" />
                                         <line x1="8" y1="12" x2="16" y2="12" />
                                     </svg>
-                                    Choose PDF File
+                                    <span data-i18n="choose_pdf_btn">Choose PDF File</span>
                                 </button>
                                 <input type="file" id="file-input" accept=".pdf" style="display: none;">
                             </div>
-                            <p class="file-size-info">No size limit. Processing is 100% local.</p>
+                            <p class="file-size-info" data-i18n="size_limit_info">No size limit. Processing is 100% local.</p>
                         </div>
                     </div>
                 </div>
@@ -68,7 +68,7 @@
                 <!-- Editor Sidebar/Toolbar -->
                 <div class="editor-toolbar glass">
                     <div class="file-meta">
-                        <button id="btn-back-upload" class="btn btn-secondary btn-icon-only" title="Choose another file">
+                        <button id="btn-back-upload" class="btn btn-secondary btn-icon-only" data-i18n-title="choose_another_title" title="Choose another file">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="19" y1="12" x2="5" y2="12" />
                                 <polyline points="12 19 5 12 12 5" />
@@ -84,22 +84,22 @@
 
                     <!-- Batch controls -->
                     <div class="batch-controls">
-                        <button id="btn-auto-blank" class="btn btn-outline" title="Automatically mark blank pages for deletion">
+                        <button id="btn-auto-blank" class="btn btn-outline" data-i18n-title="mark_blank_title" title="Automatically mark blank pages for deletion">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                                 <circle cx="12" cy="12" r="10" />
                                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                             </svg>
-                            Mark blank pages
+                            <span data-i18n="mark_blank_btn">Mark blank pages</span>
                         </button>
-                        <button id="btn-clear-all-images" class="btn btn-outline-warning" title="Clear images from all pages">
+                        <button id="btn-clear-all-images" class="btn btn-outline-warning" data-i18n-title="clear_images_all_title" title="Clear images from all pages">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                                 <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
                                 <path d="m9 12 2 2 4-4" />
                             </svg>
-                            Clear images (all)
+                            <span data-i18n="clear_images_all_btn">Clear images (all)</span>
                         </button>
                         <button id="btn-reset-selection" class="btn btn-text">
-                            Reset changes
+                            <span data-i18n="reset_changes_btn">Reset changes</span>
                         </button>
                     </div>
 
@@ -109,7 +109,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
-                            Optimize & Save PDF
+                            <span data-i18n="optimize_save_btn">Optimize & Save PDF</span>
                         </button>
                     </div>
                 </div>
@@ -117,15 +117,15 @@
                 <!-- Stats summary bar -->
                 <div class="stats-bar glass">
                     <div class="stat-item">
-                        <span class="stat-label">To delete:</span>
+                        <span class="stat-label" data-i18n="to_delete_label">To delete:</span>
                         <span id="stat-delete-count" class="stat-value text-red">0 pages</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">To clear images:</span>
+                        <span class="stat-label" data-i18n="to_clean_label">To clear images:</span>
                         <span id="stat-clean-count" class="stat-value text-yellow">0 pages</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Will keep:</span>
+                        <span class="stat-label" data-i18n="will_keep_label">Will keep:</span>
                         <span id="stat-keep-count" class="stat-value text-green">0 pages</span>
                     </div>
                 </div>
@@ -143,8 +143,8 @@
                 <div class="spinner-wrapper">
                     <div class="spinner"></div>
                 </div>
-                <h2>Optimizing PDF file...</h2>
-                <p id="progress-status" class="overlay-subtitle">Processing pages and removing unnecessary images...</p>
+                <h2 data-i18n="optimizing_title">Optimizing PDF file...</h2>
+                <p id="progress-status" class="overlay-subtitle" data-i18n="optimizing_subtitle">Processing pages and removing unnecessary images...</p>
                 <div class="progress-bar-container">
                     <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
                 </div>
@@ -160,13 +160,13 @@
                         <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </div>
-                <h2>PDF Optimized Successfully!</h2>
-                <p class="overlay-subtitle">Unnecessary pages and background images have been removed.</p>
+                <h2 data-i18n="success_title">PDF Optimized Successfully!</h2>
+                <p class="overlay-subtitle" data-i18n="success_subtitle">Unnecessary pages and background images have been removed.</p>
 
                 <!-- Comparison stats -->
                 <div class="comparison-container">
                     <div class="comp-box">
-                        <span class="comp-label">Original size</span>
+                        <span class="comp-label" data-i18n="orig_size_label">Original size</span>
                         <span id="size-before" class="comp-val text-muted">0.0 MB</span>
                     </div>
                     <div class="comp-arrow">
@@ -176,13 +176,13 @@
                         </svg>
                     </div>
                     <div class="comp-box">
-                        <span class="comp-label">New size</span>
+                        <span class="comp-label" data-i18n="new_size_label">New size</span>
                         <span id="size-after" class="comp-val text-green">0.0 MB</span>
                     </div>
                 </div>
 
-                <div class="savings-badge">
-                    Saved <span id="savings-percent">0%</span> of the file (<span id="savings-bytes">0 MB</span>)
+                <div class="savings-badge" id="savings-badge-text">
+                    <!-- Dynamic translated text -->
                 </div>
 
                 <div class="success-actions">
@@ -192,16 +192,16 @@
                             <polyline points="17 21 17 13 7 13 7 21" />
                             <polyline points="7 3 7 8 15 8" />
                         </svg>
-                        Save PDF File
+                        <span data-i18n="save_pdf_btn">Save PDF File</span>
                     </button>
                     <a id="btn-download-link" href="#" class="btn btn-primary btn-lg" style="display: none;">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                         </svg>
-                        Download PDF File
+                        <span data-i18n="download_pdf_btn">Download PDF File</span>
                     </a>
                     <button id="btn-process-another" class="btn btn-outline">
-                        Process another file
+                        <span data-i18n="process_another_btn">Process another file</span>
                     </button>
                 </div>
             </div>

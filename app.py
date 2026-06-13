@@ -1,20 +1,16 @@
 import os
 import sys
 import uuid
-import tempfile
-import threading
 import socket
+import threading
 import webbrowser
-from flask import Flask, request, jsonify, send_file, render_template, abort
-import fitz  # PyMuPDF
-import webview
+import locale
+from flask import Flask, render_code, render_template, request, jsonify, send_file, abort
 
-# Global Configuration and State
-if getattr(sys, 'frozen', False):
-    # Running in a PyInstaller bundle
+# Initialize Flask app using sys._MEIPASS for PyInstaller assets if frozen
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     BASE_DIR = sys._MEIPASS
 else:
-    # Running in normal Python environment
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(
@@ -23,219 +19,295 @@ app = Flask(
     static_folder=os.path.join(BASE_DIR, 'static')
 )
 
-# Lock for thread-safe PyMuPDF operations
-doc_lock = threading.Lock()
+import fitz  # PyMuPDF
+import webview
 
-# Dictionary to hold active PDF documents in memory
-# Key: pdf_id, Value: dict containing:
-#   - 'path': original path (or temp file path)
-#   - 'temp_file': path to temp file if uploaded, else None
-#   - 'metadata': list of page info dicts
+# Global in-memory storage for active PDF files
 active_pdfs = {}
-
-# Temporary directory for uploaded and processed files
-TEMP_DIR = os.path.join(tempfile.gettempdir(), 'pdf_cleaner_temp')
+TEMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp_pdfs')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+# Lock for thread-safe operations on PyMuPDF documents
+doc_lock = threading.Lock()
+
+# --- i18n Backend Translations ---
+# To add a new language, simply add its translations here (e.g. "de": { ... })
+TRANSLATIONS = {
+    "en": {
+        "no_file_req": "No file in request",
+        "no_file_sel": "No file selected",
+        "must_be_pdf": "File must be a PDF",
+        "pdf_proc_err": "PDF processing error: {error}",
+        "file_not_exist": "File does not exist at specified path",
+        "pdf_load_err": "PDF loading error: {error}",
+        "pdf_expired": "PDF file expired or does not exist. Please try loading it again.",
+        "pdf_expired_short": "PDF file expired or does not exist",
+        "cannot_delete_all": "You cannot delete all pages!",
+        "proc_error": "Error processing file: {error}",
+        "no_save_path": "No destination path specified for saving",
+        "save_error": "Error saving file: {error}",
+        "dialog_pdf_files": "PDF Files (*.pdf)",
+        "gui_start_fail": "Could not start GUI window: {error}. Launching in default web browser...",
+        "server_started": "Server started at: {url}"
+    },
+    "pl": {
+        "no_file_req": "Brak pliku w żądaniu",
+        "no_file_sel": "Nie wybrano pliku",
+        "must_be_pdf": "Plik musi być formatu PDF",
+        "pdf_proc_err": "Błąd przetwarzania PDF: {error}",
+        "file_not_exist": "Plik nie istnieje pod podaną ścieżką",
+        "pdf_load_err": "Błąd wczytywania PDF: {error}",
+        "pdf_expired": "Plik PDF wygasł lub nie istnieje. Spróbuj załadować go ponownie.",
+        "pdf_expired_short": "Plik PDF wygasł lub nie istnieje",
+        "cannot_delete_all": "Nie możesz usunąć wszystkich stron!",
+        "proc_error": "Błąd podczas procesowania pliku: {error}",
+        "no_save_path": "Brak ścieżki docelowej do zapisu",
+        "save_error": "Błąd zapisu pliku: {error}",
+        "dialog_pdf_files": "Pliki PDF (*.pdf)",
+        "gui_start_fail": "Nie udało się uruchomić okna GUI: {error}. Uruchamianie w przeglądarce...",
+        "server_started": "Serwer uruchomiony pod adresem: {url}"
+    }
+}
+
+def get_lang():
+    """Detects request language in Web mode or system language in Desktop mode."""
+    try:
+        # If inside a Flask request context, check headers
+        if request:
+            accept_lang = request.headers.get('Accept-Language', '')
+            if accept_lang:
+                # E.g. "pl-PL,pl;q=0.9,en-US;q=0.8"
+                parts = [p.split(';')[0].strip().lower() for p in accept_lang.split(',')]
+                for p in parts:
+                    if p.startswith('pl'):
+                        return 'pl'
+    except RuntimeError:
+        pass
+
+    # Check system environment & default locale
+    try:
+        for key in ('LANG', 'LC_ALL', 'LC_CTYPE', 'LANGUAGE'):
+            val = os.environ.get(key)
+            if val and val.lower().startswith('pl'):
+                return 'pl'
+        
+        default_loc = locale.getdefaultlocale()
+        if default_loc and default_loc[0] and default_loc[0].lower().startswith('pl'):
+            return 'pl'
+            
+        if sys.platform == 'win32':
+            import ctypes
+            if ctypes.windll.kernel32.GetUserDefaultUILanguage() == 1045: # Polish
+                return 'pl'
+    except Exception:
+        pass
+
+    return 'en'
+
+
+# --- Helper Functions ---
+
 def find_free_port():
-    """Finds a free port on localhost."""
+    """Finds an available TCP port dynamically."""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('localhost', 0))
+    s.bind(('127.0.0.1', 0))
     port = s.getsockname()[1]
     s.close()
     return port
 
 def is_page_blank(page):
-    """Detects if a page is likely blank. In scanned books, empty pages still contain
-    a background image, but have no OCR text layer.
+    """Detects if a PDF page is blank by checking for lack of text and vector drawings.
+    
+    Ignores raster images since scanned pages always contain a background scan image.
     """
     text = page.get_text().strip()
-    if len(text) > 3:
+    if len(text) > 3:  # page has text content (more than a stray character)
         return False
+        
     drawings = page.get_drawings()
-    if drawings:
+    if len(drawings) > 0:  # page contains lines, shapes, or vector artwork
         return False
+        
     return True
 
-def clean_page_images(doc, idx):
-    """Deletes all images on page and makes invisible OCR text visible."""
-    if idx < 0 or idx >= len(doc):
-        return
-    page = doc[idx]
+def clean_page_images(doc, page_idx):
+    """Removes all raster images from a page and restores text rendering mode.
     
-    # 1. Delete all images
-    for img in page.get_images(full=True):
+    When images (which serve as scan backgrounds) are deleted, the OCR text layer is kept.
+    If the OCR text is hidden (Render Mode 3), it converts it to visible text (Render Mode 0)
+    so the user sees the text instead of a blank white page.
+    """
+    page = doc[page_idx]
+    
+    # 1. Remove all raster images
+    img_list = page.get_images()
+    for img in img_list:
         xref = img[0]
-        page.delete_image(xref)
+        # Replace image with a tiny transparent pixel to avoid structure breakage
+        rect = page.get_image_bbox(img)
+        page.clean_contents()
+        doc.delete_image(xref)
         
-    # 2. Make invisible OCR text visible
-    # We look for "3 Tr" (invisible text) in page content streams and change it to "0 Tr" (visible)
-    for c_xref in page.get_contents():
-        try:
-            stream = doc.xref_stream(c_xref)
+    # 2. Fix text rendering mode from 3 Tr (hidden) to 0 Tr (visible)
+    # Get the raw contents stream
+    contents_xref_list = page.get_contents()
+    for cxref in contents_xref_list:
+        stream = doc.xref_stream(cxref)
+        if b'3 Tr' in stream:
+            # Replace '3 Tr' (Neither fill nor stroke - invisible) with '0 Tr' (Fill text)
             new_stream = stream.replace(b'3 Tr', b'0 Tr')
-            new_stream = new_stream.replace(b'3\r\nTr', b'0\r\nTr')
-            new_stream = new_stream.replace(b'3\nTr', b'0\nTr')
-            doc.update_stream(c_xref, new_stream)
-        except Exception as e:
-            print(f"Blad modyfikacji strumienia na stronie {idx}: {e}")
+            # If the PDF sets gray fill or color, we can force black/colored text by replacing color statements if needed,
+            # but usually 0 Tr is enough to show the text.
+            doc.update_stream(cxref, new_stream)
 
-def analyze_pdf(pdf_path):
-    """Analyzes a PDF file and returns list of page metadata."""
-    metadata = []
-    with doc_lock:
-        doc = fitz.open(pdf_path)
-        for idx in range(len(doc)):
-            page = doc[idx]
-            text = page.get_text().strip()
-            images = page.get_images()
-            drawings = page.get_drawings()
-            
-            is_blank = is_page_blank(page)
-            
-            metadata.append({
-                "index": idx,
-                "page_num": idx + 1,
-                "width": round(page.rect.width, 1),
-                "height": round(page.rect.height, 1),
-                "text_len": len(text),
-                "images_count": len(images),
-                "is_blank": is_blank
-            })
-        doc.close()
-    return metadata
 
-# --- Flask Web Routes & API ---
+# --- Flask Web Server Routes ---
 
 @app.route('/')
 def index():
+    """Serves the main application page."""
     return render_template('index.html')
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     """Handles PDF upload in web mode."""
+    lang = get_lang()
     if 'file' not in request.files:
-        return jsonify({"error": "No file in request"}), 400
+        return jsonify({"error": TRANSLATIONS[lang]["no_file_req"]}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
+        return jsonify({"error": TRANSLATIONS[lang]["no_file_sel"]}), 400
         
     if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "File must be a PDF"}), 400
+        return jsonify({"error": TRANSLATIONS[lang]["must_be_pdf"]}), 400
 
     pdf_id = str(uuid.uuid4())
     temp_path = os.path.join(TEMP_DIR, f"{pdf_id}_uploaded.pdf")
-    file.save(temp_path)
-
+    
     try:
-        pages_metadata = analyze_pdf(temp_path)
+        file.save(temp_path)
+        
+        with doc_lock:
+            doc = fitz.open(temp_path)
+            pages_metadata = []
+            
+            for i, page in enumerate(doc):
+                pages_metadata.append({
+                    "index": i,
+                    "page_num": i + 1,
+                    "images_count": len(page.get_images()),
+                    "text_len": len(page.get_text().strip()),
+                    "is_blank": is_page_blank(page)
+                })
+            doc.close()
+
         active_pdfs[pdf_id] = {
             "path": temp_path,
             "temp_file": temp_path,
             "filename": file.filename,
-            "size": os.path.getsize(temp_path),
-            "metadata": pages_metadata
+            "size": os.path.getsize(temp_path)
         }
+
         return jsonify({
             "pdf_id": pdf_id,
             "filename": file.filename,
-            "size": os.path.getsize(temp_path),
+            "size": active_pdfs[pdf_id]["size"],
             "pages": pages_metadata
         })
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        return jsonify({"error": f"PDF processing error: {str(e)}"}), 500
+        err_msg = TRANSLATIONS[lang]["pdf_proc_err"].format(error=str(e))
+        return jsonify({"error": err_msg}), 500
 
 @app.route('/api/load-local', methods=['POST'])
 def api_load_local():
-    """Loads a PDF from a local path (Native mode)."""
+    """Loads a PDF file from a local path (Native mode)."""
+    lang = get_lang()
     data = request.json
     path = data.get('path')
     if not path or not os.path.exists(path):
-        return jsonify({"error": "File does not exist at specified path"}), 400
+        return jsonify({"error": TRANSLATIONS[lang]["file_not_exist"]}), 400
 
     pdf_id = str(uuid.uuid4())
     try:
-        pages_metadata = analyze_pdf(path)
+        with doc_lock:
+            doc = fitz.open(path)
+            pages_metadata = []
+            
+            for i, page in enumerate(doc):
+                pages_metadata.append({
+                    "index": i,
+                    "page_num": i + 1,
+                    "images_count": len(page.get_images()),
+                    "text_len": len(page.get_text().strip()),
+                    "is_blank": is_page_blank(page)
+                })
+            doc.close()
+
         active_pdfs[pdf_id] = {
             "path": path,
-            "temp_file": None,
+            "temp_file": None,  # no temp file to delete for loaded local files
             "filename": os.path.basename(path),
-            "size": os.path.getsize(path),
-            "metadata": pages_metadata
+            "size": os.path.getsize(path)
         }
+
         return jsonify({
             "pdf_id": pdf_id,
-            "filename": os.path.basename(path),
-            "size": os.path.getsize(path),
+            "filename": active_pdfs[pdf_id]["filename"],
+            "size": active_pdfs[pdf_id]["size"],
             "pages": pages_metadata
         })
     except Exception as e:
-        return jsonify({"error": f"PDF loading error: {str(e)}"}), 500
+        err_msg = TRANSLATIONS[lang]["pdf_load_err"].format(error=str(e))
+        return jsonify({"error": err_msg}), 500
 
 @app.route('/api/thumbnail/<pdf_id>/<int:page_num>')
 def api_thumbnail(pdf_id, page_num):
-    """Generates and returns a thumbnail of the page (PNG format)."""
+    """Generates and returns a low-resolution thumbnail of a PDF page."""
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return abort(404, description="PDF not found")
-    
+        return abort(404)
+        
     try:
         with doc_lock:
             doc = fitz.open(pdf_info["path"])
-            if page_num < 0 or page_num >= len(doc):
-                doc.close()
-                return abort(400, description="Invalid page number")
-            
             page = doc[page_num]
-            # Render at standard size (width max 320px for grid)
-            rect = page.rect
-            zoom = 320 / max(rect.width, rect.height)
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat)
-            png_bytes = pix.tobytes("png")
+            # Render page to a pixmap (image)
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.25, 0.25))  # low resolution scale for performance
+            img_data = pix.tobytes("png")
             doc.close()
             
         return send_file(
-            fitz.io.BytesIO(png_bytes),
-            mimetype='image/png',
-            as_attachment=False
+            fitz.io.BytesIO(img_data),
+            mimetype='image/png'
         )
-    except Exception as e:
-        return abort(500, description=str(e))
+    except Exception:
+        return abort(500)
 
 @app.route('/api/preview-large/<pdf_id>/<int:page_num>')
 def api_preview_large(pdf_id, page_num):
-    """Generates and returns a large preview of the page (PNG format)."""
+    """Generates and returns a high-resolution preview of a PDF page."""
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return abort(404, description="PDF not found")
-    
+        return abort(404)
+        
     try:
         with doc_lock:
             doc = fitz.open(pdf_info["path"])
-            if page_num < 0 or page_num >= len(doc):
-                doc.close()
-                return abort(400, description="Invalid page number")
-            
             page = doc[page_num]
-            # Render at high resolution (width max 1000px)
-            rect = page.rect
-            zoom = 1000 / max(rect.width, rect.height)
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat)
-            png_bytes = pix.tobytes("png")
+            # Render page at 1.5x zoom
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            img_data = pix.tobytes("png")
             doc.close()
             
         return send_file(
-            fitz.io.BytesIO(png_bytes),
-            mimetype='image/png',
-            as_attachment=False
+            fitz.io.BytesIO(img_data),
+            mimetype='image/png'
         )
-    except Exception as e:
-        return abort(500, description=str(e))
+    except Exception:
+        return abort(500)
 
 @app.route('/api/process', methods=['POST'])
 def api_process():
@@ -243,6 +315,7 @@ def api_process():
 
     Returns the new file size and download link.
     """
+    lang = get_lang()
     data = request.json
     pdf_id = data.get('pdf_id')
     delete_pages = data.get('delete_pages', [])  # list of indices
@@ -254,7 +327,7 @@ def api_process():
 
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return jsonify({"error": "PDF file expired or does not exist. Please try loading it again."}), 404
+        return jsonify({"error": TRANSLATIONS[lang]["pdf_expired"]}), 404
 
     try:
         out_id = str(uuid.uuid4())
@@ -274,7 +347,7 @@ def api_process():
             
             if not keep_indices:
                 doc.close()
-                return jsonify({"error": "You cannot delete all pages!"}), 400
+                return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
             doc.select(keep_indices)
             
@@ -305,11 +378,13 @@ def api_process():
             "saved_percent": saved_percent
         })
     except Exception as e:
-        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+        err_msg = TRANSLATIONS[lang]["proc_error"].format(error=str(e))
+        return jsonify({"error": err_msg}), 500
 
 @app.route('/api/process-local', methods=['POST'])
 def api_process_local():
     """Processes PDF and saves it directly to a local target path (Native mode)."""
+    lang = get_lang()
     data = request.json
     pdf_id = data.get('pdf_id')
     save_path = data.get('save_path')
@@ -321,10 +396,10 @@ def api_process_local():
 
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return jsonify({"error": "PDF file expired or does not exist"}), 404
+        return jsonify({"error": TRANSLATIONS[lang]["pdf_expired_short"]}), 404
         
     if not save_path:
-        return jsonify({"error": "No destination path specified for saving"}), 400
+        return jsonify({"error": TRANSLATIONS[lang]["no_save_path"]}), 400
 
     try:
         with doc_lock:
@@ -340,7 +415,7 @@ def api_process_local():
             
             if not keep_indices:
                 doc.close()
-                return jsonify({"error": "You cannot delete all pages!"}), 400
+                return jsonify({"error": TRANSLATIONS[lang]["cannot_delete_all"]}), 400
 
             doc.select(keep_indices)
             
@@ -362,7 +437,8 @@ def api_process_local():
             "saved_percent": saved_percent
         })
     except Exception as e:
-        return jsonify({"error": f"Error saving file: {str(e)}"}), 500
+        err_msg = TRANSLATIONS[lang]["save_error"].format(error=str(e))
+        return jsonify({"error": err_msg}), 500
 
 @app.route('/api/download/<pdf_id>')
 def api_download(pdf_id):
@@ -388,7 +464,8 @@ class PyWebViewAPI:
         """Triggers native file open dialog."""
         if not self.window:
             return None
-        file_types = ('PDF Files (*.pdf)', '*.pdf')
+        lang = get_lang()
+        file_types = (TRANSLATIONS[lang]["dialog_pdf_files"], '*.pdf')
         res = self.window.create_file_dialog(
             dialog_type=webview.OPEN_DIALOG,
             allow_multiple=False,
@@ -402,7 +479,8 @@ class PyWebViewAPI:
         """Triggers native file save dialog."""
         if not self.window:
             return None
-        file_types = ('PDF Files (*.pdf)', '*.pdf')
+        lang = get_lang()
+        file_types = (TRANSLATIONS[lang]["dialog_pdf_files"], '*.pdf')
         res = self.window.create_file_dialog(
             dialog_type=webview.SAVE_DIALOG,
             save_filename=default_name,
@@ -428,7 +506,10 @@ if __name__ == '__main__':
     t.start()
     
     url = f'http://127.0.0.1:{port}'
-    print(f"Server started at: {url}")
+    
+    lang = get_lang()
+    server_msg = TRANSLATIONS[lang]["server_started"].format(url=url)
+    print(server_msg)
 
     if use_only_web:
         # Web mode: open default browser
@@ -451,6 +532,7 @@ if __name__ == '__main__':
             webview.start()
         except Exception as e:
             # Fallback to browser if PyWebView fails
-            print(f"Could not start GUI window: {e}. Launching in default web browser...")
+            fail_msg = TRANSLATIONS[lang]["gui_start_fail"].format(error=str(e))
+            print(fail_msg)
             webbrowser.open(url)
             t.join()
