@@ -18,7 +18,6 @@ if (typeof window.pywebview !== 'undefined') {
     window.addEventListener('pywebviewready', () => {
         appState.isNative = true;
         document.getElementById('connection-status').style.display = 'flex';
-        // Adjust file button style or details if needed
     });
 }
 
@@ -100,7 +99,7 @@ dropZone.addEventListener('drop', (e) => {
     if (files.length > 0 && files[0].name.toLowerCase().endsWith('.pdf')) {
         handleUpload(files[0]);
     } else {
-        alert("Dozwolone są tylko pliki PDF!");
+        alert("Only PDF files are allowed!");
     }
 });
 
@@ -134,7 +133,7 @@ async function handleUpload(file) {
     formData.append('file', file);
 
     // Show processing modal as loading state
-    progressStatus.textContent = "Wczytywanie i analiza pliku PDF...";
+    progressStatus.textContent = "Loading and analyzing PDF file...";
     progressBarFill.style.width = '50%';
     progressPercent.textContent = '50%';
     processingOverlay.classList.add('active');
@@ -149,11 +148,11 @@ async function handleUpload(file) {
         if (response.ok) {
             setupEditor(data);
         } else {
-            alert(data.error || "Wystąpił błąd podczas przesyłania pliku.");
+            alert(data.error || "An error occurred during file upload.");
         }
     } catch (err) {
         console.error(err);
-        alert("Wystąpił błąd połączenia z serwerem.");
+        alert("An error occurred connecting to the server.");
     } finally {
         processingOverlay.classList.remove('active');
     }
@@ -161,7 +160,7 @@ async function handleUpload(file) {
 
 // Load file using local path (native mode)
 async function loadLocalFile(path) {
-    progressStatus.textContent = "Wczytywanie pliku PDF...";
+    progressStatus.textContent = "Loading PDF file...";
     progressBarFill.style.width = '50%';
     progressPercent.textContent = '50%';
     processingOverlay.classList.add('active');
@@ -177,11 +176,11 @@ async function loadLocalFile(path) {
         if (response.ok) {
             setupEditor(data);
         } else {
-            alert(data.error || "Nie udało się wczytać pliku.");
+            alert(data.error || "Could not load the file.");
         }
     } catch (err) {
         console.error(err);
-        alert("Błąd połączenia.");
+        alert("Connection error.");
     } finally {
         processingOverlay.classList.remove('active');
     }
@@ -199,22 +198,16 @@ function setupEditor(data) {
     // Set header meta
     pdfFilename.textContent = appState.filename;
     pdfFilesize.textContent = formatBytes(appState.size);
-    pdfTotalPages.textContent = `${appState.pages.length} ${getPagesDeclension(appState.pages.length)}`;
+    pdfTotalPages.textContent = `${appState.pages.length} ${getPagesLabel(appState.pages.length)}`;
 
     renderGrid();
     updateStats();
     showView(editorView);
 }
 
-// Polish grammar declension for 'pages'
-function getPagesDeclension(count) {
-    if (count === 1) return 'strona';
-    const lastDigit = count % 10;
-    const lastTwo = count % 100;
-    if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 10 || lastTwo >= 20)) {
-        return 'strony';
-    }
-    return 'stron';
+// Simple label helper for singular/plural
+function getPagesLabel(count) {
+    return count === 1 ? 'page' : 'pages';
 }
 
 // Render Page Cards into Grid
@@ -248,22 +241,22 @@ function renderGrid() {
         card.innerHTML = `
             <div class="thumbnail-wrapper">
                 <div class="shimmer"></div>
-                <img class="page-thumb" data-src="/api/thumbnail/${appState.pdfId}/${page.index}" alt="Strona ${page.page_num}">
+                <img class="page-thumb" data-src="/api/thumbnail/${appState.pdfId}/${page.index}" alt="Page ${page.page_num}">
                 
                 <div class="card-actions">
-                    <button class="action-btn btn-delete" title="Oznacz do usunięcia" data-index="${page.index}">
+                    <button class="action-btn btn-delete" title="Mark for deletion" data-index="${page.index}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                         </svg>
                     </button>
-                    <button class="action-btn btn-clean" title="Usuń wszystkie obrazy" data-index="${page.index}">
+                    <button class="action-btn btn-clean" title="Remove all images" data-index="${page.index}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                             <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
                             <path d="m9 12 2 2 4-4" />
                         </svg>
                     </button>
-                    <button class="action-btn btn-zoom" title="Powiększ podgląd" data-index="${page.index}">
+                    <button class="action-btn btn-zoom" title="Zoom preview" data-index="${page.index}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                             <circle cx="11" cy="11" r="8" />
                             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -274,7 +267,7 @@ function renderGrid() {
             <div class="card-info">
                 <span class="page-number">${page.page_num}</span>
                 <div class="page-stats">
-                    <span class="stat-icon-indicator ${page.images_count > 0 ? 'has-items' : ''}" title="Obrazy: ${page.images_count}">
+                    <span class="stat-icon-indicator ${page.images_count > 0 ? 'has-items' : ''}" title="Images: ${page.images_count}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:12px;height:12px;">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                             <circle cx="8.5" cy="8.5" r="1.5" />
@@ -282,7 +275,7 @@ function renderGrid() {
                         </svg>
                         <span>${page.images_count}</span>
                     </span>
-                    <span class="stat-icon-indicator ${page.text_len > 0 ? 'has-items' : ''}" title="Znaków tekstu: ${page.text_len}">
+                    <span class="stat-icon-indicator ${page.text_len > 0 ? 'has-items' : ''}" title="Characters of text: ${page.text_len}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:12px;height:12px;">
                             <path d="M4 7V4h16v3M9 20h6M12 4v16" />
                         </svg>
@@ -317,6 +310,7 @@ function renderGrid() {
     });
 }
 
+// Toggle states
 // Toggle states
 function toggleDelete(idx, card) {
     if (appState.deletePages.has(idx)) {
@@ -353,9 +347,9 @@ function updateStats() {
     const cleanCount = appState.clearImagePages.size;
     const keepCount = appState.pages.length - deleteCount;
 
-    statDeleteCount.textContent = `${deleteCount} ${getPagesDeclension(deleteCount)}`;
-    statCleanCount.textContent = `${cleanCount} ${getPagesDeclension(cleanCount)}`;
-    statKeepCount.textContent = `${keepCount} ${getPagesDeclension(keepCount)}`;
+    statDeleteCount.textContent = `${deleteCount} ${getPagesLabel(deleteCount)}`;
+    statCleanCount.textContent = `${cleanCount} ${getPagesLabel(cleanCount)}`;
+    statKeepCount.textContent = `${keepCount} ${getPagesLabel(keepCount)}`;
 
     // Disable process button if keeping 0 pages
     btnProcessPdf.disabled = (keepCount === 0);
@@ -402,7 +396,7 @@ btnResetSelection.addEventListener('click', () => {
 });
 
 btnBackUpload.addEventListener('click', () => {
-    if (confirm("Czy na pewno chcesz opuścić edytor? Wszystkie niezapisane zmiany zostaną utracone.")) {
+    if (confirm("Are you sure you want to leave the editor? All unsaved changes will be lost.")) {
         showView(uploadView);
         appState.pdfId = null;
         appState.pages = [];
@@ -438,7 +432,7 @@ btnProcessPdf.addEventListener('click', async () => {
     const deleteList = Array.from(appState.deletePages);
     const cleanList = Array.from(appState.clearImagePages);
 
-    progressStatus.textContent = "Trwa optymalizacja stron i usuwanie zbędnych obrazów...";
+    progressStatus.textContent = "Optimizing pages and removing unnecessary images...";
     startProgressSimulation();
     processingOverlay.classList.add('active');
 
@@ -473,13 +467,13 @@ btnProcessPdf.addEventListener('click', async () => {
                     showSuccessScreen(result, true);
                 }, 400);
             } else {
-                alert(result.error || "Wystąpił błąd optymalizacji PDF.");
+                alert(result.error || "An error occurred during PDF optimization.");
                 processingOverlay.classList.remove('active');
                 clearInterval(progressInterval);
             }
         } catch (err) {
             console.error(err);
-            alert("Błąd podczas zapisywania pliku.");
+            alert("Error while saving the file.");
             processingOverlay.classList.remove('active');
             clearInterval(progressInterval);
         }
@@ -503,19 +497,20 @@ btnProcessPdf.addEventListener('click', async () => {
                     showSuccessScreen(result, false);
                 }, 400);
             } else {
-                alert(result.error || "Wystąpił błąd optymalizacji PDF.");
+                alert(result.error || "An error occurred during PDF optimization.");
                 processingOverlay.classList.remove('active');
                 clearInterval(progressInterval);
             }
         } catch (err) {
             console.error(err);
-            alert("Błąd połączenia podczas optymalizacji.");
+            alert("Connection error during optimization.");
             processingOverlay.classList.remove('active');
             clearInterval(progressInterval);
         }
     }
 });
 
+// Success screen layout
 // Success screen layout
 function showSuccessScreen(result, isLocal) {
     processingOverlay.classList.remove('active');
@@ -531,7 +526,7 @@ function showSuccessScreen(result, isLocal) {
         
         // In local mode, save is already completed
         btnSaveAs.onclick = () => {
-            alert(`Plik został zapisany bezpośrednio w: ${result.save_path}`);
+            alert(`File has been saved directly to: ${result.save_path}`);
         };
     } else {
         btnSaveAs.style.display = 'none';
@@ -554,13 +549,13 @@ btnProcessAnother.addEventListener('click', () => {
 // Zoom Modal Flow
 function openZoomModal(index, pageNum) {
     modalImg.src = '';
-    modalCaption.textContent = `Wczytywanie strony ${pageNum}...`;
+    modalCaption.textContent = `Loading page ${pageNum}...`;
     previewModal.classList.add('active');
     
     // Set large preview source
     modalImg.src = `/api/preview-large/${appState.pdfId}/${index}`;
     modalImg.onload = () => {
-        modalCaption.textContent = `Strona ${pageNum}`;
+        modalCaption.textContent = `Page ${pageNum}`;
     };
 }
 

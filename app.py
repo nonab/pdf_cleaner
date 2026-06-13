@@ -115,14 +115,14 @@ def index():
 def api_upload():
     """Handles PDF upload in web mode."""
     if 'file' not in request.files:
-        return jsonify({"error": "Brak pliku w żądaniu"}), 400
+        return jsonify({"error": "No file in request"}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "Nie wybrano pliku"}), 400
+        return jsonify({"error": "No file selected"}), 400
         
     if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Plik musi być formatu PDF"}), 400
+        return jsonify({"error": "File must be a PDF"}), 400
 
     pdf_id = str(uuid.uuid4())
     temp_path = os.path.join(TEMP_DIR, f"{pdf_id}_uploaded.pdf")
@@ -146,7 +146,7 @@ def api_upload():
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        return jsonify({"error": f"Błąd przetwarzania PDF: {str(e)}"}), 500
+        return jsonify({"error": f"PDF processing error: {str(e)}"}), 500
 
 @app.route('/api/load-local', methods=['POST'])
 def api_load_local():
@@ -154,7 +154,7 @@ def api_load_local():
     data = request.json
     path = data.get('path')
     if not path or not os.path.exists(path):
-        return jsonify({"error": "Plik nie istnieje pod podaną ścieżką"}), 400
+        return jsonify({"error": "File does not exist at specified path"}), 400
 
     pdf_id = str(uuid.uuid4())
     try:
@@ -173,7 +173,7 @@ def api_load_local():
             "pages": pages_metadata
         })
     except Exception as e:
-        return jsonify({"error": f"Błąd wczytywania PDF: {str(e)}"}), 500
+        return jsonify({"error": f"PDF loading error: {str(e)}"}), 500
 
 @app.route('/api/thumbnail/<pdf_id>/<int:page_num>')
 def api_thumbnail(pdf_id, page_num):
@@ -254,7 +254,7 @@ def api_process():
 
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return jsonify({"error": "Plik PDF wygasł lub nie istnieje. Spróbuj załadować go ponownie."}), 404
+        return jsonify({"error": "PDF file expired or does not exist. Please try loading it again."}), 404
 
     try:
         out_id = str(uuid.uuid4())
@@ -274,7 +274,7 @@ def api_process():
             
             if not keep_indices:
                 doc.close()
-                return jsonify({"error": "Nie możesz usunąć wszystkich stron!"}), 400
+                return jsonify({"error": "You cannot delete all pages!"}), 400
 
             doc.select(keep_indices)
             
@@ -305,7 +305,7 @@ def api_process():
             "saved_percent": saved_percent
         })
     except Exception as e:
-        return jsonify({"error": f"Błąd podczas procesowania pliku: {str(e)}"}), 500
+        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
 @app.route('/api/process-local', methods=['POST'])
 def api_process_local():
@@ -321,10 +321,10 @@ def api_process_local():
 
     pdf_info = active_pdfs.get(pdf_id)
     if not pdf_info:
-        return jsonify({"error": "Plik PDF wygasł lub nie istnieje"}), 404
+        return jsonify({"error": "PDF file expired or does not exist"}), 404
         
     if not save_path:
-        return jsonify({"error": "Brak ścieżki docelowej do zapisu"}), 400
+        return jsonify({"error": "No destination path specified for saving"}), 400
 
     try:
         with doc_lock:
@@ -340,7 +340,7 @@ def api_process_local():
             
             if not keep_indices:
                 doc.close()
-                return jsonify({"error": "Nie możesz usunąć wszystkich stron!"}), 400
+                return jsonify({"error": "You cannot delete all pages!"}), 400
 
             doc.select(keep_indices)
             
@@ -362,7 +362,7 @@ def api_process_local():
             "saved_percent": saved_percent
         })
     except Exception as e:
-        return jsonify({"error": f"Błąd zapisu pliku: {str(e)}"}), 500
+        return jsonify({"error": f"Error saving file: {str(e)}"}), 500
 
 @app.route('/api/download/<pdf_id>')
 def api_download(pdf_id):
@@ -388,7 +388,7 @@ class PyWebViewAPI:
         """Triggers native file open dialog."""
         if not self.window:
             return None
-        file_types = ('Pliki PDF (*.pdf)', '*.pdf')
+        file_types = ('PDF Files (*.pdf)', '*.pdf')
         res = self.window.create_file_dialog(
             dialog_type=webview.OPEN_DIALOG,
             allow_multiple=False,
@@ -402,7 +402,7 @@ class PyWebViewAPI:
         """Triggers native file save dialog."""
         if not self.window:
             return None
-        file_types = ('Pliki PDF (*.pdf)', '*.pdf')
+        file_types = ('PDF Files (*.pdf)', '*.pdf')
         res = self.window.create_file_dialog(
             dialog_type=webview.SAVE_DIALOG,
             save_filename=default_name,
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     t.start()
     
     url = f'http://127.0.0.1:{port}'
-    print(f"Serwer uruchomiony pod adresem: {url}")
+    print(f"Server started at: {url}")
 
     if use_only_web:
         # Web mode: open default browser
@@ -451,6 +451,6 @@ if __name__ == '__main__':
             webview.start()
         except Exception as e:
             # Fallback to browser if PyWebView fails
-            print(f"Nie udało się uruchomić okna GUI: {e}. Uruchamianie w przeglądarce...")
+            print(f"Could not start GUI window: {e}. Launching in default web browser...")
             webbrowser.open(url)
             t.join()
