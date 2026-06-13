@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page & Image Cleaner</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Background Decorative Gradients -->
+        <div class="glow-bg glow-1"></div>
+        <div class="glow-bg glow-2"></div>
+
+        <!-- HEADER -->
+        <header class="main-header glass">
+            <div class="logo">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="logo-icon">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <path d="M8 13h8M8 17h8" />
+                </svg>
+                <h1>PDF <span>Cleaner</span></h1>
+            </div>
+            <div id="connection-status" class="status-badge native-badge" style="display: none;">
+                <span class="dot"></span> Tryb Desktop (Szybki)
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- VIEW 1: UPLOAD / DRAG & DROP -->
+            <section id="upload-view" class="active-view">
+                <div class="upload-card glass">
+                    <div id="drop-zone" class="drop-zone">
+                        <div class="drop-zone-content">
+                            <div class="upload-icon-wrapper">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="upload-icon">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                                </svg>
+                            </div>
+                            <h2>Przeciągnij i upuść plik PDF</h2>
+                            <p class="upload-subtitle">lub wybierz go z dysku swojego komputera</p>
+                            
+                            <div class="upload-actions">
+                                <button id="btn-select-file" class="btn btn-primary btn-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="12" y1="8" x2="12" y2="16" />
+                                        <line x1="8" y1="12" x2="16" y2="12" />
+                                    </svg>
+                                    Wybierz plik PDF
+                                </button>
+                                <input type="file" id="file-input" accept=".pdf" style="display: none;">
+                            </div>
+                            <p class="file-size-info">Maksymalny rozmiar: brak limitu. Przetwarzanie odbywa się w 100% lokalnie.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: EDITOR / GRID VIEW -->
+            <section id="editor-view" class="inactive-view">
+                <!-- Editor Sidebar/Toolbar -->
+                <div class="editor-toolbar glass">
+                    <div class="file-meta">
+                        <button id="btn-back-upload" class="btn btn-secondary btn-icon-only" title="Wybierz inny plik">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="12" x2="5" y2="12" />
+                                <polyline points="12 19 5 12 12 5" />
+                            </svg>
+                        </button>
+                        <div class="file-details">
+                            <h3 id="pdf-filename">Nazwa_pliku.pdf</h3>
+                            <span id="pdf-filesize">0.0 MB</span>
+                            <span class="meta-divider">•</span>
+                            <span id="pdf-total-pages">0 stron</span>
+                        </div>
+                    </div>
+
+                    <!-- Batch controls -->
+                    <div class="batch-controls">
+                        <button id="btn-auto-blank" class="btn btn-outline" title="Automatycznie zaznacz puste strony do usunięcia">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                            </svg>
+                            Oznacz puste strony
+                        </button>
+                        <button id="btn-clear-all-images" class="btn btn-outline-warning" title="Wyczyść obrazy ze wszystkich stron">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                                <path d="m9 12 2 2 4-4" />
+                            </svg>
+                            Oczyszczenie obrazów (wszystkie)
+                        </button>
+                        <button id="btn-reset-selection" class="btn btn-text">
+                            Resetuj zmiany
+                        </button>
+                    </div>
+
+                    <!-- Process action button -->
+                    <div class="action-wrapper">
+                        <button id="btn-process-pdf" class="btn btn-success btn-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Optymalizuj i zapisz PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats summary bar -->
+                <div class="stats-bar glass">
+                    <div class="stat-item">
+                        <span class="stat-label">Do usunięcia:</span>
+                        <span id="stat-delete-count" class="stat-value text-red">0 stron</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Do oczyszczenia z obrazów:</span>
+                        <span id="stat-clean-count" class="stat-value text-yellow">0 stron</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Pozostanie:</span>
+                        <span id="stat-keep-count" class="stat-value text-green">0 stron</span>
+                    </div>
+                </div>
+
+                <!-- Grid of pages -->
+                <div id="pages-grid" class="pages-grid">
+                    <!-- Dynamic page cards will be inserted here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- OVERLAY: PROCESSING PROGRESS -->
+        <div id="processing-overlay" class="overlay">
+            <div class="overlay-card glass">
+                <div class="spinner-wrapper">
+                    <div class="spinner"></div>
+                </div>
+                <h2>Trwa optymalizacja pliku PDF</h2>
+                <p id="progress-status" class="overlay-subtitle">Przetwarzanie stron i usuwanie zbędnych obrazów...</p>
+                <div class="progress-bar-container">
+                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <div id="progress-percent" class="progress-percent">0%</div>
+            </div>
+        </div>
+
+        <!-- OVERLAY: SUCCESS SCREEN -->
+        <div id="success-overlay" class="overlay">
+            <div class="overlay-card glass success-card">
+                <div class="success-icon-wrapper">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="success-icon animate-success">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </div>
+                <h2>Plik zoptymalizowany pomyślnie!</h2>
+                <p class="overlay-subtitle">Pomyślnie usunięto zbędne strony i obrazy tła.</p>
+
+                <!-- Comparison stats -->
+                <div class="comparison-container">
+                    <div class="comp-box">
+                        <span class="comp-label">Rozmiar początkowy</span>
+                        <span id="size-before" class="comp-val text-muted">0.0 MB</span>
+                    </div>
+                    <div class="comp-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                        </svg>
+                    </div>
+                    <div class="comp-box">
+                        <span class="comp-label">Nowy rozmiar</span>
+                        <span id="size-after" class="comp-val text-green">0.0 MB</span>
+                    </div>
+                </div>
+
+                <div class="savings-badge">
+                    Zaoszczędzono <span id="savings-percent">0%</span> pliku (<span id="savings-bytes">0 MB</span>)
+                </div>
+
+                <div class="success-actions">
+                    <button id="btn-save-as" class="btn btn-primary btn-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                            <polyline points="17 21 17 13 7 13 7 21" />
+                            <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                        Zapisz plik PDF
+                    </button>
+                    <a id="btn-download-link" href="#" class="btn btn-primary btn-lg" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        Pobierz plik PDF
+                    </a>
+                    <button id="btn-process-another" class="btn btn-outline">
+                        Przetwórz kolejny plik
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: IMAGE PREVIEW -->
+        <div id="preview-modal" class="modal">
+            <span id="btn-close-modal" class="modal-close">&times;</span>
+            <div class="modal-content-wrapper">
+                <img id="modal-img" class="modal-content" src="" alt="Podgląd strony">
+                <div id="modal-caption" class="modal-caption">Strona 1</div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+</body>
+</html>
