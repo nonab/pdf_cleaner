@@ -266,10 +266,10 @@ def compress_image_xref(doc, xref, quality=50):
         # Determine target colorspace and re-encode
         if not pix.colorspace or pix.colorspace.n > 3 or pix.alpha:
             pix_rgb = fitz.Pixmap(fitz.csRGB, pix)
-            compressed_bytes = pix_rgb.tobytes("jpg", quality=quality)
+            compressed_bytes = pix_rgb.tobytes("jpg", jpg_quality=quality)
             colorspace_name = "/DeviceRGB"
         else:
-            compressed_bytes = pix.tobytes("jpg", quality=quality)
+            compressed_bytes = pix.tobytes("jpg", jpg_quality=quality)
             if pix.colorspace.n == 1:
                 colorspace_name = "/DeviceGray"
             else:
